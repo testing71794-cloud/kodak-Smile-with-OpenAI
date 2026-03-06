@@ -1,5 +1,6 @@
-node_modules/
-build/
-.env
-.DS_Store
-.vscode/
+ai-doctor/artifacts/
+artifacts/
+report.xml
+*.log
+screenshots/
+test-output/
