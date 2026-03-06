@@ -1,0 +1,19 @@
+{
+  "name": "kodak-maestro-suite",
+  "version": "1.0.0",
+  "description": "Maestro AI Doctor with Ollama",
+  "type": "module",
+  "main": "index.mjs",
+  "scripts": {
+    "start": "node ./index.mjs"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "fast-glob": "^3.3.3",
+    "nodemailer": "^8.0.1",
+    "xml2js": "^0.6.2"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
