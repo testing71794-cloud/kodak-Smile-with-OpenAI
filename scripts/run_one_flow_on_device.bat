@@ -9,6 +9,8 @@ REM %4 = APP_ID
 REM %5 = CLEAR_STATE
 REM %6 = MAESTRO_CMD
 REM %7 = INCLUDE_TAG (optional)
+REM %8 = EXPECTED_DEVICE_COUNT (optional)
+REM %9 = SYNC_KEY (optional)
 
 set "SUITE=%~1"
 set "FLOW_PATH=%~2"
@@ -17,6 +19,8 @@ set "APP_ID=%~4"
 set "CLEAR_STATE=%~5"
 set "MAESTRO_CMD=%~6"
 set "INCLUDE_TAG=%~7"
+set "EXPECTED_DEVICE_COUNT=%~8"
+set "SYNC_KEY=%~9"
 
 if "%SUITE%"=="" exit /b 10
 if "%FLOW_PATH%"=="" exit /b 11
@@ -24,6 +28,8 @@ if "%DEVICE_ID%"=="" exit /b 12
 if "%APP_ID%"=="" exit /b 13
 if "%MAESTRO_CMD%"=="" set "MAESTRO_CMD=maestro"
 if "%INCLUDE_TAG%"=="__EMPTY__" set "INCLUDE_TAG="
+if "%EXPECTED_DEVICE_COUNT%"=="" set "EXPECTED_DEVICE_COUNT=1"
+if "%SYNC_KEY%"=="" set "SYNC_KEY=default"
 
 set "CLASSPATH="
 set "JAVA_TOOL_OPTIONS="
@@ -48,17 +54,21 @@ set "REPORT_ROOT=%REPO_ROOT%\reports\%SUITE%"
 set "LOG_DIR=%REPORT_ROOT%\logs"
 set "RESULT_DIR=%REPORT_ROOT%\results"
 set "STATUS_DIR=%REPO_ROOT%\status"
+set "SYNC_DIR=%STATUS_DIR%\sync"
 
 if not exist "%REPORT_ROOT%" mkdir "%REPORT_ROOT%"
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
 if not exist "%RESULT_DIR%" mkdir "%RESULT_DIR%"
 if not exist "%STATUS_DIR%" mkdir "%STATUS_DIR%"
+if not exist "%SYNC_DIR%" mkdir "%SYNC_DIR%"
 
 set "SAFE_FLOW=%FLOW_NAME: =_%"
 set "SAFE_DEVICE=%DEVICE_ID: =_%"
+set "SAFE_SYNC=%SYNC_KEY: =_%"
 set "LOG_FILE=%LOG_DIR%\%SAFE_FLOW%_%SAFE_DEVICE%.log"
 set "RESULT_FILE=%RESULT_DIR%\%SAFE_FLOW%_%SAFE_DEVICE%.csv"
 set "STATUS_FILE=%STATUS_DIR%\%SUITE%__%SAFE_FLOW%__%SAFE_DEVICE%.txt"
+set "READY_FILE=%SYNC_DIR%\%SAFE_SYNC%__%SAFE_DEVICE%.ready"
 
 (
 echo =====================================
@@ -72,6 +82,8 @@ echo Device           : %DEVICE_ID%
 echo App id           : %APP_ID%
 echo Clear state      : %CLEAR_STATE%
 echo Include tag      : %INCLUDE_TAG%
+echo Expected devices : %EXPECTED_DEVICE_COUNT%
+echo Sync key         : %SYNC_KEY%
 echo JAVA_HOME        : %JAVA_HOME%
 echo MAESTRO_HOME     : %MAESTRO_HOME%
 echo Maestro cmd      : %MAESTRO_BIN%
@@ -112,7 +124,36 @@ if /I "%CLEAR_STATE%"=="true" (
     echo Clear-state exit code: !errorlevel!>> "%LOG_FILE%"
 )
 
-set "MAESTRO_ARGS=test "%FLOW_PATH%" --device "%DEVICE_ID%""
+REM Barrier sync: wait until all devices for this flow/retry batch are ready.
+> "%READY_FILE%" echo ready=%DEVICE_ID%
+echo Waiting at sync barrier...>> "%LOG_FILE%"
+set /a BARRIER_TIMEOUT=60
+set /a BARRIER_COUNT=0
+
+:barrier_wait
+set /a READY_COUNT=0
+for %%F in ("%SYNC_DIR%\%SAFE_SYNC%__*.ready") do (
+    if exist "%%~fF" set /a READY_COUNT+=1
+)
+
+echo Barrier status: !READY_COUNT! / %EXPECTED_DEVICE_COUNT%>> "%LOG_FILE%"
+
+if !READY_COUNT! GEQ %EXPECTED_DEVICE_COUNT% goto :barrier_release
+
+set /a BARRIER_COUNT+=1
+if !BARRIER_COUNT! GEQ !BARRIER_TIMEOUT! (
+    echo WARNING: Barrier timeout reached. Continuing with !READY_COUNT! ready devices.>> "%LOG_FILE%"
+    goto :barrier_release
+)
+
+ping 127.0.0.1 -n 2 >nul
+goto :barrier_wait
+
+:barrier_release
+REM Small final pause so all launched processes cross the barrier together.
+ping 127.0.0.1 -n 3 >nul
+
+set "MAESTRO_ARGS=--device "%DEVICE_ID%" test "%FLOW_PATH%""
 if not "%INCLUDE_TAG%"=="" set "MAESTRO_ARGS=%MAESTRO_ARGS% --include-tags "%INCLUDE_TAG%""
 
 echo Starting Maestro test...>> "%LOG_FILE%"
@@ -141,6 +182,8 @@ if not "%RUN_EXIT%"=="0" (
     echo suite,flow,device,status,exit_code,reason,log_file
     echo %SUITE%,%FLOW_NAME%,%DEVICE_ID%,%STATUS_VALUE%,%RUN_EXIT%,%REASON%,"%LOG_FILE%"
 )
+
+if exist "%READY_FILE%" del /q "%READY_FILE%" >nul 2>&1
 
 echo. >> "%LOG_FILE%"
 echo Final status   : %STATUS_VALUE%>> "%LOG_FILE%"
