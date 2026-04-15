@@ -3,7 +3,7 @@ setlocal EnableExtensions
 
 REM Force Java 25 + user-installed Maestro location
 set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-25.0.2.10-hotspot"
-set "MAESTRO_HOME=%USERPROFILE%\maestro\maestro\bin"
+set "MAESTRO_HOME=C:\Users\HP\maestro\maestro\bin"
 
 if not exist "%JAVA_HOME%\bin\java.exe" (
   echo ERROR: Java not found at %JAVA_HOME%

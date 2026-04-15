@@ -1,0 +1,31 @@
+appId: com.kodaksmile
+---
+- tapOn: Select
+- tapOn:
+    id: imageViewPhoto
+    index: 1
+- waitForAnimationToEnd
+
+- tapOn:
+    id: imageViewPhoto
+    index: 2
+- waitForAnimationToEnd
+- tapOn: Pre-Cuts
+- waitForAnimationToEnd
+# ) Fine-tune popup (optional)
+# ------------------------------
+- runFlow:
+    when:
+      visible: "Time to Fine-Tune"
+    commands:
+      - runFlow:
+          when:
+            visible: "Ok"
+          commands:
+            - tapOn: "Ok"
+      - runFlow:
+          when:
+            visible: "OK"
+          commands:
+            - tapOn: "OK"
+      - waitForAnimationToEnd
